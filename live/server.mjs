@@ -99,10 +99,27 @@ const isPro = () => licenseInfo().tier === 'pro';
 const maxSeats = () => licenseInfo().maxSeats;
 
 const CAPS = [24, 36, 64, 100];
+// Halls with painted cushions (theme.json → seats) start with exactly that many seats, so a small crowd sits on them.
+// The cushions follow the hall.jpg actually shown: a theme still borrowing its fallback's hall borrows its cushions too.
+const themeCache = new Map();
+function readTheme(id){
+  const c = themeCache.get(id); if (c && Date.now() - c.at < 5000) return c.m;
+  let m = null; try { m = JSON.parse(fs.readFileSync(path.join(THEMES_DIR, id, 'theme.json'), 'utf8')); } catch {}
+  themeCache.set(id, { m, at: Date.now() }); return m;
+}
+function hallSlots(){
+  const id = effectiveTheme(), m = readTheme(id); if (!m) return 0;
+  const own = typeof m.hall === 'string' && fs.existsSync(path.join(THEMES_DIR, id, path.basename(m.hall)));
+  const src = own ? m : (/^[a-z0-9-]{1,40}$/.test(String(m.fallback || '')) ? readTheme(m.fallback) : null);
+  if (!src || !Array.isArray(src.seats) || !src.seats.length) return [];
+  const k = src.seats.length, e = Array.isArray(src.seatsExtra) ? src.seatsExtra.length : 0;
+  return e ? [k, k + e] : [k];
+}
 function capacity(){
   const max = maxSeats();
   if (settings.seatMode !== 'auto') return Math.min(+settings.seatMode, max);
-  const n = viewers.size; return CAPS.find(c => n <= c && c <= max) || max;
+  const t = hallSlots(), top = t[t.length - 1] || 0, caps = top ? [...t, ...CAPS.filter(c => c > top)] : CAPS;
+  const n = viewers.size; return caps.find(c => n <= c && c <= max) || max;
 }
 function trimToCapacity(){                       // after a downgrade: the longest-quiet non-donors stand up first
   const max = maxSeats();

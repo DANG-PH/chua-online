@@ -41,7 +41,7 @@ tools/license.mjs          keygen | issue | verify (chỉ người bán dùng)
 docs/                      research, kế hoạch kinh doanh, phân tích kỹ thuật, prompt cho designer
 ```
 
-- Tọa độ phụ thuộc tranh nền (sàn, hào quang, khói hương, 3 vị sư) nằm trong `theme.json`, **không hard-code trong JS**.
+- Tọa độ phụ thuộc tranh nền (sàn, hào quang, khói hương, 3 vị sư, bồ đoàn vẽ sẵn `seats`/`seatsExtra`/`perspective`) nằm trong `theme.json`, **không hard-code trong JS**. Sức chứa tự động: theme classic là 16 → 24 → 36 → 64 → 100, theme không có `seats` là 24 → 36 → 64 → 100.
 - Thêm cài đặt mới: khai báo mặc định trong `settings`, thêm luật trong `SETTING_RULES` (kẹp kiểu/giới hạn), thêm id vào `SETTING_IDS` của `control.html`.
 - Server chỉ phục vụ `/assets` và `/live`; `/live/data/` luôn trả 404. Giữ mô hình bảo mật này (127.0.0.1, kiểm tra Host và Origin).
 

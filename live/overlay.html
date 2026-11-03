@@ -104,6 +104,7 @@ addEventListener('resize', fit); fit();
 // Painting-dependent numbers come from assets/themes/<id>/theme.json (see docs/design/README.md)
 let THEME = null, A = {}, FLOOR = { yTop:1215, yBot:1845, halfTop:290, halfBot:430 }, ALTAR = { haloX:540, haloY:560, haloScale:2.7, smokeX:540, smokeY:1000, glowTop:300, glowHeight:800 };
 let TEACHERS = [], SEATED_H = 260, themeId = null, TRACKS = [];
+let SLOTS = [], SLOTS_X = [], PERSP = null;                                  // painted cushions of the hall in use (theme.json → seats/perspective)
 const hasAnim = k => !!(THEME && THEME.hasAnim(k));
 async function useTheme(id){
   if (!id || id === themeId) return;
@@ -116,7 +117,8 @@ async function useTheme(id){
   ChuaTheme.applyColors(t.meta);
   const changed = TRACKS.map(x=>x.src).join() !== t.music.map(x=>x.src).join();
   TRACKS = t.music; if (changed && AC) { trackIdx = 0; nextTrack(); }
-  layout(cap);
+  SLOTS = []; SLOTS_X = []; PERSP = null; layout(cap);
+  t.hallReady.then(() => { if (THEME !== t) return; SLOTS = t.slots(); SLOTS_X = t.slotsExtra(); PERSP = t.perspective(); layout(cap); });
 }
 const avatars = new Map();
 function avatar(url){ if(!url) return null; let im=avatars.get(url); if(!im){ im=new Image(); im.referrerPolicy='no-referrer'; im.src=url; avatars.set(url,im); } return im.naturalWidth?im:null; }
@@ -124,9 +126,24 @@ function avatar(url){ if(!url) return null; let im=avatars.get(url); if(!im){ im
 /* ======================= seats ======================= */
 // Floor trapezoid in the painting: back row just below the altar, front row near the bottom.
 const GRID = { 24:[6,4], 36:[6,6], 64:[8,8], 100:[10,10] };
-let cap = 24, seats = [];
+let cap = 24, seats = [], slotMode = false;
+// perspective scale at a given y (painted-cushion halls only)
+const persp = y => { const p = PERSP; if (!p) return .4; return Math.max(.25, Math.min(1.35, p.s0 + (p.s1-p.s0)*(y-p.y0)/(p.y1-p.y0))); };
 function layout(c){
-  cap = GRID[c] ? c : 24; const [cols, rows] = GRID[cap]; seats = [];
+  cap = +c || 24;
+  // few people: sit exactly on the cushions painted in the hall, at the painting's own scale
+  // a little more: extra seats squeezed between the painted ones, same perspective (theme.json → seatsExtra)
+  if (SLOTS.length && (cap === SLOTS.length || cap === SLOTS.length + SLOTS_X.length)){
+    slotMode = true;
+    const all = [...SLOTS, ...SLOTS_X].slice(0, cap);
+    seats = all.map((p,i) => {
+      let g = Infinity; for (const q of all) if (q !== p && Math.abs(q.y-p.y) < 20) g = Math.min(g, Math.abs(q.x-p.x));
+      return { x:p.x, y:p.y, scale: persp(p.y), r:0, k:i, gap: Math.min(400, g === Infinity ? 400 : g*.93) };
+    });
+    reseat(); return;
+  }
+  slotMode = false;
+  const [cols, rows] = GRID[cap] || GRID[24]; seats = [];
   for (let r=0;r<rows;r++){
     const t = rows===1 ? .5 : r/(rows-1);                     // 0 = back row
     const y = FLOOR.yTop + (FLOOR.yBot-FLOOR.yTop)*t;
@@ -298,8 +315,8 @@ connect();
 const ctx=$('c').getContext('2d');
 function sprite(im,x,y,s,ay=1){ if(!im?.naturalWidth) return; const w=im.naturalWidth*s,h=im.naturalHeight*s; ctx.drawImage(im,x-w/2,y-h*ay,w,h); }
 function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
-function tag(text,x,y,s,style,av,maxW){
-  const fs=Math.max(15,Math.round(30*s/.4)); ctx.font=`600 ${fs}px "Be Vietnam Pro",system-ui,sans-serif`;
+function tag(text,x,y,s,style,av,maxW,fsz){
+  const fs=fsz||Math.min(34,Math.max(15,Math.round(30*s/.4))); ctx.font=`600 ${fs}px "Be Vietnam Pro",system-ui,sans-serif`;
   const pad=fs*.5; let aw = av?fs*1.15:0;
   if (maxW){ if (aw && maxW < fs*5) aw=0, av=null; let t=text; while (t.length>2 && ctx.measureText(t).width+pad*2+aw > maxW) t=t.slice(0,-1); if (t!==text) text=t.trimEnd()+'…'; }
   const w=ctx.measureText(text).width+pad*2+aw, h=fs*1.5;
@@ -309,7 +326,7 @@ function tag(text,x,y,s,style,av,maxW){
   ctx.fillStyle = style==='gold'?'#ffd98a':'#f6e9cf'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(text, x+aw/2, y+1);
 }
 function bubble(text,x,y,s){
-  const fs=Math.max(18,Math.round(26*s/.4)); ctx.font=`500 ${fs}px "Be Vietnam Pro",system-ui,sans-serif`;
+  const fs=slotMode ? Math.min(30,Math.max(16,Math.round(34*s))) : Math.min(30,Math.max(18,Math.round(26*s/.4))); ctx.font=`500 ${fs}px "Be Vietnam Pro",system-ui,sans-serif`;
   let t=text; while (ctx.measureText(t).width>320 && t.length>4) t=t.slice(0,-2); if (t!==text) t=t.trimEnd()+'…';
   const w=ctx.measureText(t).width+fs*1.1, h=fs*1.6;
   ctx.fillStyle='rgba(255,247,230,.95)'; rr(x-w/2,y-h,w,h,fs*.5); ctx.fill();
@@ -342,7 +359,9 @@ function frame(now){
     } else if (v.state==='sitting'){ v.sitT+=dt; v.frame=4+Math.min(3,Math.floor(v.sitT/.22)); if (v.sitT>.9){ v.state='sit'; v.frame=7; } }
     else if (v.seat){ v.x+=(v.seat.x-v.x)*Math.min(1,dt*3); v.y+=(v.seat.y-v.y)*Math.min(1,dt*3); }      // glide when the grid grows
     v.fade=Math.min(1,v.fade+dt*2); v.glow=Math.max(0,v.glow-dt*.45); v.bow=Math.max(0,v.bow-dt*.7);
-    const ws = v.state==='walk' ? (.26+.26*Math.max(0,Math.min(1,(v.y-FLOOR.yTop)/(FLOOR.yBot-FLOOR.yTop)))) * ((6/((GRID[cap]||GRID[24])[0]))**.7) : s;
+    const target = v.state==='walk' ? (slotMode ? persp(v.y) : (.26+.26*Math.max(0,Math.min(1,(v.y-FLOOR.yTop)/(FLOOR.yBot-FLOOR.yTop)))) * ((6/((GRID[cap]||GRID[24])[0]))**.7)) : s;
+    v.ds = (v.ds == null || v.state==='walk') ? target : v.ds + (target - v.ds)*Math.min(1, dt*3);   // grow/shrink smoothly when the layout changes
+    const ws = v.ds;
     if (v.glow>0 || v.skin==='master'){ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=Math.max(v.glow*.75, v.skin==='master'?.35+.1*Math.sin(t*1.6):0);
       const g=ctx.createRadialGradient(v.x,v.y-110*ws,8,v.x,v.y-110*ws,200*ws); g.addColorStop(0,'rgba(255,205,120,.95)'); g.addColorStop(1,'rgba(255,160,60,0)'); ctx.fillStyle=g; ctx.fillRect(v.x-230*ws,v.y-340*ws,460*ws,400*ws); ctx.restore(); }
     const breathe = v.state==='sit' ? Math.sin(t*1.1+v.phase)*2*ws : 0, bowK = v.state==='sit' ? Math.sin(Math.min(1,v.bow)*Math.PI)*.04 : 0;
@@ -351,9 +370,9 @@ function frame(now){
     if (anim){ const a=THEME.animSpec(v.skin), k=ws*1.05*SEATED_H/a.seatH; if (v.flip) ctx.scale(-1,1); ctx.drawImage(A['anim_'+v.skin], v.frame*a.fw,0,a.fw,a.fh, -a.fw*k/2, -a.fh*k+breathe, a.fw*k, a.fh*k); topY=(v.state==='sit'?a.seatH:a.fh*.97)*k; }
     else { const sk = v.skin==='master'?'monk':v.skin; sprite(A[sk]||A.man,0,breathe,ws*1.05); topY=SEATED_H*ws; }
     ctx.restore();
-    const ty=v.y-topY-14*ws/.4;
-    tag(v.days>=2 ? `${v.name} ✦${v.days}` : v.name, v.x, ty, ws, v.skin==='master'||v.coins>=99||v.days>=7?'gold':'', avatar(v.avatar), v.state==='sit' ? v.seat?.gap : 0);
-    if (v.bubble && now<v.bubble.until) bubbles.push([v.bubble.text, v.x, ty-Math.max(18,30*ws/.4), ws]); else v.bubble=null;
+    const ty=v.y-topY-Math.min(30,14*ws/.4);
+    tag(v.days>=2 ? `${v.name} ✦${v.days}` : v.name, v.x, ty, ws, v.skin==='master'||v.coins>=99||v.days>=7?'gold':'', avatar(v.avatar), v.state==='sit' ? v.seat?.gap : 0, slotMode ? Math.min(34,Math.max(15,Math.round(38*ws))) : 0);   // painted cushions: tags shrink with depth so back rows don't collide
+    if (v.bubble && now<v.bubble.until) bubbles.push([v.bubble.text, v.x, ty-Math.min(46,Math.max(18,30*ws/.4)), ws]); else v.bubble=null;
   }
   for (const b of bubbles) bubble(...b);
   // gift icons rising, petals / hearts

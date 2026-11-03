@@ -18,20 +18,27 @@
   }
 
   // Tries each candidate [url, spec] in order; the loaded Image carries the spec of the file that won.
+  // im.ready resolves true once a file loaded, false if every candidate failed.
   function image(cands) {
     const im = new Image();
-    let i = 0;
+    let i = 0, done;
+    im.ready = new Promise(r => { done = r; });
     const next = () => {
       while (i < cands.length && !cands[i][0]) i++;
-      if (i >= cands.length) return;
+      if (i >= cands.length) { im.spec = null; done(false); return; }
       const [url, spec] = cands[i++];
       im.spec = spec || null;
       im.src = url;
     };
+    im.onload = () => done(true);
     im.onerror = next;
     next();
     return im;
   }
+
+  // Painted cushions belong to the painting: they follow whichever hall.jpg actually loaded.
+  const pts = (a) => Array.isArray(a) && a.length ? a.map(p => ({ x: +p.x, y: +p.y })) : null;
+  const hallSpec = (x) => x ? { seats: pts(x.seats), extra: pts(x.seatsExtra), perspective: x.perspective || null } : null;
 
   async function loadTheme(id, base) {
     base = base || '/assets/';
@@ -50,7 +57,7 @@
     const m = Object.assign({}, fb || {}, meta);             // painting coordinates: the theme's own, else fallback's
 
     const A = {};
-    A.hall = image([[own(meta.hall)], [alt(fb && fb.hall)]]);
+    A.hall = image([[own(meta.hall), hallSpec(meta)], [alt(fb && fb.hall), hallSpec(fb)]]);
     const cs = (meta.characters || {}).seated || {}, fcs = ((fb || {}).characters || {}).seated || {};
     for (const k of SKINS) A[k] = image([[own(cs[k])], [alt(fcs[k])]]);
     const cw = (meta.characters || {}).walk || {}, fcw = ((fb || {}).characters || {}).walk || {};
@@ -74,6 +81,10 @@
       seatedHeight: ((m.characters || {}).seatedHeight) || 260,
       hasAnim: (k) => { const im = A['anim_' + k]; return !!(im && im.naturalWidth > 0 && im.spec); },
       animSpec: (k) => (A['anim_' + k] || {}).spec || null,
+      hallReady: A.hall.ready,
+      slots: () => (A.hall.spec && A.hall.spec.seats) || [],             // valid after hallReady
+      slotsExtra: () => (A.hall.spec && A.hall.spec.seats && A.hall.spec.extra) || [],
+      perspective: () => (A.hall.spec && A.hall.spec.perspective) || null,
     };
   }
 

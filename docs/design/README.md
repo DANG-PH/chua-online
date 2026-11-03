@@ -42,7 +42,9 @@ y=1860 │   [ dòng miễn trừ trách nhiệm ]        │
 y=1920 └──────────────────────────────────────┘
 ```
 
-Khác bản cũ một điểm quan trọng: **sàn để trống, không vẽ sẵn bồ đoàn**. Mỗi nhân vật đã mang bồ đoàn của mình, và số chỗ ngồi thay đổi từ 24 đến 100.
+Khuyến nghị: **sàn để trống, không vẽ sẵn bồ đoàn**. Mỗi nhân vật đã mang bồ đoàn của mình, và số chỗ ngồi thay đổi từ 16 đến 100.
+
+Nếu vẫn muốn vẽ sẵn bồ đoàn (như bản classic) thì phải gửi kèm tọa độ từng cái: tâm x, đáy y, chiều rộng. Lập trình viên sẽ khai báo vào `seats` / `perspective` trong `theme.json`. Khi ít người, mỗi người sẽ ngồi đúng lên một bồ đoàn vẽ. Bồ đoàn vẽ nên dẹt giống bồ đoàn trong ảnh nhân vật (tỉ lệ cao/rộng ≈ 1/3), nếu không mép trên sẽ lộ ra sau lưng người ngồi.
 
 Nếu bố cục bắt buộc phải lệch (ví dụ tượng Phật cao hơn), báo lại tọa độ mới. Lập trình viên sửa các số trong `assets/themes/tinh-tam/theme.json` (`floor`, `altar`, `teachers`) mà không phải sửa code.
 

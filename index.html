@@ -146,9 +146,12 @@ const hasAnim = k => !!(THEME && THEME.hasAnim(k));
 let FLOOR = { yTop: 1215, yBot: 1845, halfTop: 290, halfBot: 430 };
 const ROWS = 6, COLS = 6, AISLE = 0.9;                                      // 36 seats, central aisle
 const seats = [];
+let SLOTS = [], PERSP = null;                   // painted cushions of the hall in use (theme.json → seats/perspective)
+const persp = y => { const p = PERSP; if (!p) return .4; return Math.max(.25, Math.min(1.35, p.s0 + (p.s1-p.s0)*(y-p.y0)/(p.y1-p.y0))); };
 function buildSeats(){
   const old = seats.splice(0);
-  for (let r=0;r<ROWS;r++){
+  if (SLOTS.length) for (const p of SLOTS) seats.push({ x:p.x, y:p.y, scale: persp(p.y), r:0, c:0, taken:null });   // sit on the painted cushions
+  else for (let r=0;r<ROWS;r++){
     const t = (r+.55)/ROWS;                      // 0 back → 1 front
     const y = FLOOR.yTop + (FLOOR.yBot-FLOOR.yTop)*t;
     const half = FLOOR.halfTop + (FLOOR.halfBot-FLOOR.halfTop)*t;
@@ -160,9 +163,9 @@ function buildSeats(){
     }
   }
   // fill from the front rows nearest the aisle first (so the hall always looks full near the camera)
-  seats.sort((a,b)=> (b.r-a.r) || (Math.abs(a.x-SW/2)-Math.abs(b.x-SW/2)));
+  if (!SLOTS.length) seats.sort((a,b)=> (b.r-a.r) || (Math.abs(a.x-SW/2)-Math.abs(b.x-SW/2)));
   // keep everyone seated after a theme change (same order, new coordinates)
-  old.forEach((s,i)=>{ const v=s.taken; if (!v) return; seats[i].taken=v; v.seat=seats[i]; if (v.state==='sit'){ v.x=seats[i].x; v.y=seats[i].y; } });
+  old.forEach((s,i)=>{ const v=s.taken; if (!v) return; const ns = seats[i] && !seats[i].taken ? seats[i] : freeSeat(); if (!ns){ visitors.splice(visitors.indexOf(v),1); return; } ns.taken=v; v.seat=ns; if (v.state==='sit'){ v.x=ns.x; v.y=ns.y; } });
 }
 buildSeats();
 const DOOR = { x: SW/2, y: SH + 120 };         // walk in from below the frame
@@ -171,8 +174,8 @@ const DOOR = { x: SW/2, y: SH + 120 };         // walk in from below the frame
 const visitors = [], fx = [], floaters = [];
 const SKINS = ['man','woman','granny','man','woman','nun','monk','child'];
 function freeSeat(){ return seats.find(s=>!s.taken) || null; }
-function addVisitor(name, skin, instant, isMe){
-  const seat = freeSeat(); if(!seat) return null;
+function addVisitor(name, skin, instant, isMe, at){
+  const seat = at || freeSeat(); if(!seat) return null;
   const v = { name, skin, seat, x: instant?seat.x:DOOR.x, y: instant?seat.y:DOOR.y, state: instant?'sit':'walk', t:0, frame: 7, ft:0, sitT:-1, flip:false, fade: instant?1:0, bob:0, bow:0, glow:0, isMe:!!isMe, phase:Math.random()*6.28 };
   seat.taken = v; visitors.push(v); updateCount(); return v;
 }
@@ -182,14 +185,20 @@ function updateCount(){ countEl.textContent = visitors.length; }
 
 // simulated crowd so the hall never opens empty (labelled as simulated on the entry card)
 const DEMO = ['Diệu Hạnh','Minh Tâm','Thiện Đức','Huệ An','Tịnh Nhã','Quảng Trí','Chơn Như','Pháp Hỷ','Nguyên Thanh','Tâm Đăng','Diệu Liên','Trí Hải','Phước Lộc','Hạnh Nguyện','Như Ý','Bảo Châu','Thanh Lương','Từ Tâm','An Lạc','Giác Hoa','Tuệ Minh','Liên Hương'];
-DEMO.forEach((n,i)=>addVisitor(n, SKINS[i%SKINS.length], true));
+function populate(){
+  const n = Math.min(DEMO.length, seats.length - 2);
+  for (let i=0, k=0; k<n && i<seats.length; i++){             // seat 1 (front row, right side: clear of the chat feed) is kept for the visitor
+    if (i===1 || seats[i].taken) continue;
+    addVisitor(DEMO[k], SKINS[k%SKINS.length], true, false, seats[i]); k++;
+  }
+}
 
 /* ---- theme ---- */
 ChuaTheme.loadTheme(THEME_ID, 'assets/').then(t => {
   THEME = t; A = t.A; TRACKS = t.music; SEATED_H = t.seatedHeight;
   FLOOR = Object.assign({}, FLOOR, t.meta.floor); ALTAR = Object.assign({}, ALTAR, t.meta.altar);
-  buildSeats();
-}).catch(e => console.warn('theme', e));
+  return t.hallReady.then(() => { SLOTS = t.slots(); PERSP = t.perspective(); buildSeats(); populate(); });
+}).catch(e => { console.warn('theme', e); populate(); });
 
 /* ---- personal practice: streak + bead count, kept only in this browser ---- */
 const today = () => new Date().toLocaleDateString('sv');
@@ -387,8 +396,8 @@ function tick(now){
       if (v.sitT > .9){ v.state='sit'; v.frame=7; if (v.isMe) showToast('Đã an tọa. Chạm vào chánh điện để niệm Phật.'); }
     }
     v.fade = Math.min(1, v.fade + dt*2);
-    const sc = v.state==='walk' ? (.22+.33*((v.y-FLOOR.yTop)/(FLOOR.yBot-FLOOR.yTop))) : v.seat.scale;
-    const s = Math.max(.2, Math.min(.75, sc));
+    const sc = v.state==='walk' ? (SLOTS.length ? persp(v.y) : .22+.33*((v.y-FLOOR.yTop)/(FLOOR.yBot-FLOOR.yTop))) : v.seat.scale;
+    const s = Math.max(.2, Math.min(SLOTS.length ? 1.35 : .75, sc));
     v.bow = Math.max(0, v.bow - dt*.7); v.glow = Math.max(0, v.glow - dt*.5);
     const breathe = (reduce||v.state!=='sit')?0:Math.sin(t*1.1+v.phase)*2*s;
     if (v.glow>0){ ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=v.glow*.7; const g=ctx.createRadialGradient(v.x,v.y-90*s,10,v.x,v.y-90*s,170*s); g.addColorStop(0,'rgba(255,200,110,.9)'); g.addColorStop(1,'rgba(255,160,60,0)'); ctx.fillStyle=g; ctx.fillRect(v.x-200*s,v.y-300*s,400*s,340*s); ctx.restore(); }
