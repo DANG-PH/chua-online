@@ -1,9 +1,9 @@
 {
-  "name": "chanh-dien-live",
-  "version": "1.0.0",
+  "name": "chua-online-live",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "TikTok LIVE overlay server for Chánh Điện Tịnh Tâm",
+  "description": "Chùa Online: TikTok LIVE overlay server",
   "scripts": { "start": "node server.mjs" },
   "dependencies": {
     "msedge-tts": "2.1.1",
