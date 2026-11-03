@@ -81,6 +81,8 @@ node tools/license.mjs issue --to "Tên khách" --tiktok @kenh --days 365
 
 ## Đưa web lên
 
+Đang chạy tại **https://dang-ph.github.io/chua-online/** (GitHub Pages, nhánh `main`, thư mục gốc; mỗi lần push lên `main` là tự cập nhật sau khoảng 1 phút).
+
 `index.html` + `assets/` là site tĩnh: đưa lên Cloudflare Pages, Netlify hay bất kỳ hosting tĩnh nào (`_headers` đặt cache cho `/assets`). Chọn theme qua `?theme=`. Link "phát trên TikTok LIVE" bật lên khi điền `STREAMER_URL` trong `index.html`.
 
 ## Tài liệu

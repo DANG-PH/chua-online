@@ -57,6 +57,7 @@ Kiểm tra nhanh mà không cần TikTok: bảng điều khiển → Diễn tậ
 ## Trạng thái (03/11/2026)
 
 - Đã có: hệ thống theme, license Free/Pro, chế độ An toàn, lọc bình luận, khóa diễn tập khi LIVE, niệm chung, hồi hướng, chào người quay lại, web niệm 108 biến + chuỗi ngày + nút mời bạn. Đã kiểm thử 21 trường hợp qua WebSocket và chụp màn hình headless.
+- Web đã deploy: https://dang-ph.github.io/chua-online/ (GitHub Pages từ `main` /, có `.nojekyll`). Đổi domain thì sửa `og:url`/`og:image` trong `index.html`.
 - **Chưa thử với một phiên TikTok LIVE thật.**
 - **Phải quyết trước khi bán:** `tiktok-live-connector@2.5.0` dùng giấy phép AGPL-3.0 (bản 2.4.0 là MIT). Xem mục 9 của `docs/business/ke-hoach-thuong-mai-hoa.md`.
 - Đồ họa: theme `tinh-tam` đang dùng tạm file của `classic` (Google Flow/Gemini, chưa rõ quyền thương mại). Đang chờ designer làm theo `docs/design/`. Khi có đủ file và giấy tờ thì đổi `commercialReady: true`.
